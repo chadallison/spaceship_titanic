@@ -58,7 +58,7 @@ test_NA = data.frame(names(test), colSums(is.na(test))) |>
 train_NA / test_NA
 ```
 
-![](space_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
 ### visualizing where missing values occur
 
@@ -87,7 +87,7 @@ test_NA = data.frame(is.na(test)) |>
 train_NA + test_NA
 ```
 
-![](space_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
 
 ### exploring `home_planet`
 
@@ -119,7 +119,7 @@ hp_rates = train |>
 hp_counts / hp_rates
 ```
 
-![](space_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
 
 ### exploring `cryo_sleep`
 
@@ -152,7 +152,7 @@ cryo_rate = train |>
 cryo_count / cryo_rate
 ```
 
-![](space_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
 
 ### separating `cabin` into `cabin_x` and `cabin_y`
 
@@ -172,11 +172,11 @@ train |>
     ## # A tibble: 5 x 2
     ##   cabin_x cabin_y
     ##   <chr>   <chr>  
-    ## 1 F       S      
-    ## 2 C       P      
-    ## 3 G       P      
-    ## 4 F       S      
-    ## 5 F       P
+    ## 1 G       S      
+    ## 2 G       P      
+    ## 3 D       P      
+    ## 4 F       P      
+    ## 5 B       P
 
 ### exploring `cabin_x`
 
@@ -204,7 +204,7 @@ cx_rate = train |>
 cx_count / cx_rate
 ```
 
-![](space_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
 ### moving `cabin_x` level *T* to level *other* (low frequency)
 
@@ -235,7 +235,7 @@ cx_rate = train |>
 cx_count / cx_rate
 ```
 
-![](space_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 ### exploring `cabin_y`
 
@@ -263,19 +263,97 @@ cy_rate = train |>
 cy_count / cy_rate
 ```
 
-![](space_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+
+### exploring `destination`
+
+``` r
+train = train |>
+  mutate(destination = ifelse(is.na(destination), "unknown", destination))
+
+dest_count = train |>
+  count(destination) |>
+  ggplot(aes(destination, n)) +
+  geom_col(aes(fill = destination), show.legend = F) +
+  geom_text(aes(label = n), size = 3.5, vjust = -0.5) +
+  labs(x = "destination", y = "count", title = "destination counts") +
+  theme(axis.text.y = element_blank()) +
+  coord_cartesian(ylim = c(0, 6500))
+
+dest_rate = train |>
+  group_by(destination) |>
+  summarise(pct = round(sum(transported) / n(), 3)) |>
+  mutate(lab = paste0(pct * 100, "%")) |>
+  ggplot(aes(destination, pct)) +
+  geom_col(aes(fill = destination), show.legend = F) +
+  geom_text(aes(label = lab), size = 3.5, vjust = -0.5) +
+  labs(y = "transport rate", title = "transport rates by destination") +
+  theme(axis.text.y = element_blank()) +
+  coord_cartesian(ylim = c(0, 0.75))
+
+dest_count / dest_rate
+```
+
+![](README_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+
+### exploring `age`
+
+``` r
+train |>
+  filter(!is.na(age)) |>
+  ggplot(aes(age)) +
+  geom_histogram(bins = 25, fill = "#A3BBA0", col = "black") +
+  labs(x = "age", y = "count", title = "histogram of age",
+       subtitle = "slightly right-skewed; will impute missing data with median") +
+  theme(plot.subtitle = element_text(hjust = 0.5, size = 9, face = "italic", vjust = 2.75))
+```
+
+![](README_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+
+### replacing missing `age` values & creating `age_group`
+
+``` r
+train = train |>
+  mutate(age = ifelse(is.na(age), median(train$age, na.rm = T), age))
+
+age_scat = train |>
+  group_by(age) |>
+  summarise(pct = sum(transported) / n(),
+            n = n()) |>
+  ggplot(aes(age, pct)) +
+  geom_point(aes(size = n), col = "#A191A6") +
+  labs(y = "transport rate", size = "count", title = "transport rate by age")
+
+age_cut = train |>
+  mutate(age_group = cut_number(age, n = 5)) |>
+  group_by(age_group) |>
+  summarise(pct = round(sum(transported) / n(), 3),
+            n = n()) |>
+  mutate(lab = paste0(pct * 100, "%")) |>
+  ggplot(aes(age_group, pct)) +
+  geom_col(aes(fill = age_group), show.legend = F) +
+  geom_text(aes(label = lab), size = 3.5, vjust = -0.5) +
+  labs(x = "age group", y = NULL, title = "transport rate by age group") +
+  theme(axis.text.y = element_blank()) +
+  coord_cartesian(ylim = c(0, 0.7))
+
+age_scat + age_cut
+```
+
+![](README_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
 ### xxx
 
 ``` r
 train |>
-  count(destination)
+  mutate(vip = case_when(vip == T ~ "vip",
+                         vip == F ~ "non-vip",
+                         is.na(vip) ~ "unknown")) |>
+  group_by(vip) |>
+  summarise(pct = round(sum(transported) / n(), 3),
+            n = n()) |>
+  ggplot(aes(vip, pct)) +
+  geom_col()
 ```
 
-    ## # A tibble: 4 x 2
-    ##   destination       n
-    ##   <chr>         <int>
-    ## 1 55 Cancri e    1800
-    ## 2 PSO J318.5-22   796
-    ## 3 TRAPPIST-1e    5915
-    ## 4 <NA>            182
+![](README_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
