@@ -111,6 +111,10 @@ train_NA + test_NA
 
 ![](README_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
 
+``` r
+rm(train_NA, test_NA)
+```
+
 ### exploring `home_planet`
 
 ``` r
@@ -202,10 +206,10 @@ train |>
     ## # A tibble: 5 x 2
     ##   cabin_x cabin_y
     ##   <chr>   <chr>  
-    ## 1 G       P      
-    ## 2 F       P      
-    ## 3 D       S      
-    ## 4 E       S      
+    ## 1 B       P      
+    ## 2 D       P      
+    ## 3 F       S      
+    ## 4 B       S      
     ## 5 C       P
 
 ### exploring `cabin_x`
@@ -649,13 +653,13 @@ train |>
 ```
 
     ## # A tibble: 5 x 2
-    ##   first_name last_name  
-    ##   <chr>      <chr>      
-    ## 1 Suhelik    Opshosent  
-    ## 2 Oalls      Flate      
-    ## 3 Vanley     Woodgezalez
-    ## 4 Gleney     Carpennels 
-    ## 5 Nelley     Freevenson
+    ##   first_name last_name 
+    ##   <chr>      <chr>     
+    ## 1 Allene     Noeley    
+    ## 2 Eduard     Sweenez   
+    ## 3 Kendre     Merkins   
+    ## 4 Varkes     Kart      
+    ## 5 Luise      Franankson
 
 ### exploring `first_name`
 
@@ -699,25 +703,119 @@ first_count / first_rate
 
 ![](README_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
 
-### basic glm
-
 ``` r
-glm_split = initial_split(train, prop = 0.8)
-traintrain = training(glm_split)
-traintest = testing(glm_split)
-
-mod = glm(transported ~ home_planet + cryo_sleep + cabin_x + cabin_y + destination + age +
-                        vip + room_service + food_court + shopping_mall + spa + vr_deck,
-          data = traintrain, family = "binomial")
-
-res = traintest |>
-  mutate(pred = predict(mod, traintest, type = "response"),
-         pred_trans = ifelse(pred >= 0.5, 1, 0)) |>
-  count(transported == pred_trans) |>
-  pull(n)
-
-acc = round(res[2] / sum(res), 4)
-paste0("BASIC GLM ACCURACY: ", acc * 100, "%")
+rm(first_name_classes, first_count, first_rate)
 ```
 
-    ## [1] "BASIC GLM ACCURACY: 75.5%"
+### xxx
+
+``` r
+last_name_classes = train |>
+  group_by(last_name) |>
+  summarise(n = n(),
+            pct = round(sum(transported) / n(), 3)) |>
+  mutate(class = case_when(n >= 3 & pct >= 0.5 ~ "high freq / rate",
+                           n >= 3 & pct < 0.5 ~ "high freq, low rate",
+                           n < 3 | last_name == "unknown" ~ "low freq / unknown"),
+         class = factor(class, levels = c("high freq / rate", "high freq, low rate", "low freq / unknown"))) |>
+  select(last_name, last_name_class = class)
+
+train = train |>
+  left_join(last_name_classes, by = "last_name") |>
+  select(-last_name)
+
+last_count = train |>
+  count(last_name_class) |>
+  ggplot(aes(last_name_class, n)) +
+  geom_col(aes(fill = last_name_class), show.legend = F) +
+  geom_text(aes(label = n), size = 3.5, vjust = -0.5) +
+  labs(x = NULL, y = "count", title = "last name class counts") +
+  theme(axis.text.y = element_blank()) +
+  coord_cartesian(ylim = c(0, 4500))
+
+last_rate = train |>
+  group_by(last_name_class) |>
+  summarise(pct = round(sum(transported) / n(), 3)) |>
+  mutate(lab = paste0(pct * 100, "%")) |>
+  ggplot(aes(last_name_class, pct)) +
+  geom_col(aes(fill = last_name_class), show.legend = F) +
+  geom_text(aes(label = lab), size = 3.5, vjust = -0.5) +
+  labs(x = "last name class", y = "transport rate", title = "transport rate by last name class") +
+  theme(axis.text.y = element_blank()) +
+  coord_cartesian(ylim = c(0, 0.75))
+
+last_count / last_rate
+```
+
+![](README_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+
+``` r
+rm(last_name_classes, last_count, last_rate)
+```
+
+### MODELING!
+
+``` r
+train = train |>
+  mutate(transported = ifelse(transported == 1, "transported", "not transported"))
+
+tictoc::tic()
+
+doParallel::registerDoParallel()
+split = initial_split(sample_n(train, 1000), prop = 0.75, strata = transported)
+traintrain = training(split)
+traintest = testing(split)
+
+pre_recipe = recipe(transported ~ ., data = traintrain) |>
+  update_role(passenger_id, new_role = "ID") |>
+  step_string2factor(all_nominal()) |>
+  step_nzv(all_nominal()) |>
+  prep()
+
+prepped_data = bake(pre_recipe, new_data = traintrain)
+cv_folds = vfold_cv(prepped_data, v = 5)
+
+xgb_model = boost_tree(trees = 1000, min_n = tune(), tree_depth = tune(),
+                       learn_rate = tune(), loss_reduction = tune()) |>
+  set_engine("xgboost") |>
+  set_mode("classification")
+
+xgb_params = parameters(min_n(), tree_depth(), learn_rate(), loss_reduction())
+xgb_grid = grid_max_entropy(xgb_params, size = 25)
+
+xgb_wf = workflow() |>
+  add_model(xgb_model) |>
+  add_formula(transported ~ .)
+
+xgb_tuned = tune_grid(object = xgb_wf, resamples = cv_folds, grid = xgb_grid,
+                      metrics = metric_set(f_meas), control = control_grid(verbose = T))
+
+xgb_best_params = xgb_tuned |>
+  select_best("f_meas")
+
+xgb_model_final = xgb_model |>
+  finalize_model(xgb_best_params)
+
+train_prediction = xgb_model_final |>
+  fit(formula = transported ~ ., data = prepped_data) |>
+  predict(new_data = prepped_data) |>
+  bind_cols(prepped_data)
+```
+
+    ## [17:08:47] WARNING: amalgamation/../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+
+``` r
+res = train_prediction |>
+  count(.pred_class == transported) |>
+  pull(n)
+
+paste0("accuracy: ", round(res[2] / sum(res), 4) * 100, "%")
+```
+
+    ## [1] "accuracy: 83.71%"
+
+``` r
+tictoc::toc()
+```
+
+    ## 462.37 sec elapsed
