@@ -8,21 +8,20 @@ knit: (function(input, ...) { rmarkdown::render(input, output_file = "README.md"
 
 ### contents
 
-- [setup]
-- [data import]
-- [finding missing data]
-- [visualizing where missing values occur]
-- [exploring `home_planet`]
-- [exploring `cryo_sleep`]
-- [separating `cabin` into `cabin_x` and `cabin_y`]
-- [exploring `cabin_x`]
-- [moving `cabin_x` level *T* to level *other* (low frequency)]
-- [exploring `cabin_y`]
-- [exploring `destination`]
-- [exploring `age`]
-- [replacing missing `age` values & creating `age_group`]
-- [exploring `vip`]
-- []
+<!-- - [setup] -->
+<!-- - [data import] -->
+<!-- - [finding missing data] -->
+<!-- - [visualizing where missing values occur] -->
+<!-- - [exploring `home_planet`] -->
+<!-- - [exploring `cryo_sleep`] -->
+<!-- - [separating `cabin` into `cabin_x` and `cabin_y`] -->
+<!-- - [exploring `cabin_x`] -->
+<!-- - [moving `cabin_x` level *T* to level *other* (low frequency)] -->
+<!-- - [exploring `cabin_y`] -->
+<!-- - [exploring `destination`] -->
+<!-- - [exploring `age`] -->
+<!-- - [replacing missing `age` values & creating `age_group`] -->
+<!-- - [exploring `vip`] -->
 
 ### setup
 
@@ -371,7 +370,7 @@ vip_count / vip_rate
 rm(vip_count, vip_rate)
 ```
 
-### xxx
+### exploring `room_service`
 
 ```{r}
 nonzero_median = pull(summarise(filter(train, room_service > 0), med = median(room_service)), med)
@@ -408,7 +407,7 @@ rs_count / rs_rate
 rm(rs_count, rs_rate)
 ```
 
-### xxx
+### exploring `food_court`
 
 ```{r}
 nonzero_median = pull(summarise(filter(train, food_court > 0), med = median(food_court)), med)
@@ -602,7 +601,7 @@ first_count / first_rate
 rm(first_name_classes, first_count, first_rate)
 ```
 
-### xxx
+### exploring `last_name`
 
 ```{r}
 last_name_classes = train |>
@@ -643,49 +642,97 @@ last_count / last_rate
 rm(last_name_classes, last_count, last_rate)
 ```
 
-### MODELING!
+### changing `transported` labels for modeling
 
 ```{r}
 train = train |>
   mutate(transported = ifelse(transported == 1, "transported", "not transported"))
 
-tictoc::tic()
+train |>
+  count(transported)
+```
 
-doParallel::registerDoParallel()
-split = initial_split(sample_n(train, 1000), prop = 0.75, strata = transported)
-traintrain = training(split)
-traintest = testing(split)
+### data splitting
 
-pre_recipe = recipe(transported ~ ., data = traintrain) |>
+```{r}
+split = initial_split(sample_n(train, 500), prop = 0.75, strata = transported)
+train_data = training(split)
+test_data = testing(split)
+
+paste0("training data: ", nrow(train_data), " rows, ", ncol(train_data), " columns")
+paste0("testing data: ", nrow(test_data), " rows, ", ncol(test_data), " columns")
+```
+
+### creating preprocessing recipe
+
+```{r}
+pre_recipe = recipe(transported ~ ., data = train_data) |>
   update_role(passenger_id, new_role = "ID") |>
   step_string2factor(all_nominal()) |>
-  step_nzv(all_nominal()) |>
   prep()
 
-prepped_data = bake(pre_recipe, new_data = traintrain)
-cv_folds = vfold_cv(prepped_data, v = 5)
+pre_recipe
+```
 
+### creating prepped data and cross-validation folds
+
+```{r}
+prepped_data = bake(pre_recipe, new_data = train_data)
+cv_folds = vfold_cv(prepped_data, v = 3)
+cv_folds
+```
+
+### building model specification
+
+```{r}
 xgb_model = boost_tree(trees = 1000, min_n = tune(), tree_depth = tune(),
                        learn_rate = tune(), loss_reduction = tune()) |>
-  set_engine("xgboost") |>
+  set_engine("xgboost", eval_metric = "logloss") |>
   set_mode("classification")
 
+xgb_model
+```
+
+### creating tuning parameters, grid, and modeling workflow
+
+```{r}
 xgb_params = parameters(min_n(), tree_depth(), learn_rate(), loss_reduction())
-xgb_grid = grid_max_entropy(xgb_params, size = 25)
+xgb_grid = grid_max_entropy(xgb_params, size = 10)
 
 xgb_wf = workflow() |>
   add_model(xgb_model) |>
   add_formula(transported ~ .)
 
-xgb_tuned = tune_grid(object = xgb_wf, resamples = cv_folds, grid = xgb_grid,
-                      metrics = metric_set(f_meas), control = control_grid(verbose = T))
+xgb_wf
+```
 
+### tuning the model
+
+```{r}
+doParallel::registerDoParallel()
+
+xgb_tuned = tune_grid(object = xgb_wf, resamples = cv_folds, grid = xgb_grid,
+                      metrics = metric_set(accuracy), control = control_grid(verbose = F))
+
+xgb_tuned |>
+  show_best("accuracy")
+```
+
+### finalizing model
+
+```{r}
 xgb_best_params = xgb_tuned |>
-  select_best("f_meas")
+  select_best("accuracy")
 
 xgb_model_final = xgb_model |>
   finalize_model(xgb_best_params)
 
+xgb_model_final
+```
+
+### fitting tuned model on all training data
+
+```{r}
 train_prediction = xgb_model_final |>
   fit(formula = transported ~ ., data = prepped_data) |>
   predict(new_data = prepped_data) |>
@@ -696,8 +743,6 @@ res = train_prediction |>
   pull(n)
 
 paste0("accuracy: ", round(res[2] / sum(res), 4) * 100, "%")
-
-tictoc::toc()
 ```
 
 

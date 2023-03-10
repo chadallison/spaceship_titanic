@@ -5,25 +5,20 @@ spaceship titanic
 
 ### contents
 
-- [setup](#setup)
-- [data import](#data-import)
-- [finding missing data](#finding-missing-data)
-- [visualizing where missing values
-  occur](#visualizing-where-missing-values-occur)
-- [exploring `home_planet`](#exploring-home_planet)
-- [exploring `cryo_sleep`](#exploring-cryo_sleep)
-- [separating `cabin` into `cabin_x` and
-  `cabin_y`](#separating-cabin-into-cabin_x-and-cabin_y)
-- [exploring `cabin_x`](#exploring-cabin_x)
-- [moving `cabin_x` level *T* to level *other* (low
-  frequency)](#moving-cabin_x-level-t-to-level-other-low-frequency)
-- [exploring `cabin_y`](#exploring-cabin_y)
-- [exploring `destination`](#exploring-destination)
-- [exploring `age`](#exploring-age)
-- [replacing missing `age` values & creating
-  `age_group`](#replacing-missing-age-values-creating-age_group)
-- [exploring `vip`](#exploring-vip)
-- \[\]
+<!-- - [setup] -->
+<!-- - [data import] -->
+<!-- - [finding missing data] -->
+<!-- - [visualizing where missing values occur] -->
+<!-- - [exploring `home_planet`] -->
+<!-- - [exploring `cryo_sleep`] -->
+<!-- - [separating `cabin` into `cabin_x` and `cabin_y`] -->
+<!-- - [exploring `cabin_x`] -->
+<!-- - [moving `cabin_x` level *T* to level *other* (low frequency)] -->
+<!-- - [exploring `cabin_y`] -->
+<!-- - [exploring `destination`] -->
+<!-- - [exploring `age`] -->
+<!-- - [replacing missing `age` values & creating `age_group`] -->
+<!-- - [exploring `vip`] -->
 
 ### setup
 
@@ -207,10 +202,10 @@ train |>
     ##   cabin_x cabin_y
     ##   <chr>   <chr>  
     ## 1 B       P      
-    ## 2 D       P      
-    ## 3 F       S      
-    ## 4 B       S      
-    ## 5 C       P
+    ## 2 G       P      
+    ## 3 G       P      
+    ## 4 F       P      
+    ## 5 B       S
 
 ### exploring `cabin_x`
 
@@ -437,7 +432,7 @@ vip_count / vip_rate
 rm(vip_count, vip_rate)
 ```
 
-### xxx
+### exploring `room_service`
 
 ``` r
 nonzero_median = pull(summarise(filter(train, room_service > 0), med = median(room_service)), med)
@@ -479,7 +474,7 @@ rs_count / rs_rate
 rm(rs_count, rs_rate)
 ```
 
-### xxx
+### exploring `food_court`
 
 ``` r
 nonzero_median = pull(summarise(filter(train, food_court > 0), med = median(food_court)), med)
@@ -653,13 +648,13 @@ train |>
 ```
 
     ## # A tibble: 5 x 2
-    ##   first_name last_name 
-    ##   <chr>      <chr>     
-    ## 1 Allene     Noeley    
-    ## 2 Eduard     Sweenez   
-    ## 3 Kendre     Merkins   
-    ## 4 Varkes     Kart      
-    ## 5 Luise      Franankson
+    ##   first_name last_name
+    ##   <chr>      <chr>    
+    ## 1 Dianie     Dickman  
+    ## 2 unknown    unknown  
+    ## 3 Cassa      Carsoning
+    ## 4 Inerry     Briggston
+    ## 5 Weias      Duckil
 
 ### exploring `first_name`
 
@@ -707,7 +702,7 @@ first_count / first_rate
 rm(first_name_classes, first_count, first_rate)
 ```
 
-### xxx
+### exploring `last_name`
 
 ``` r
 last_name_classes = train |>
@@ -753,58 +748,199 @@ last_count / last_rate
 rm(last_name_classes, last_count, last_rate)
 ```
 
-### MODELING!
+### changing `transported` labels for modeling
 
 ``` r
 train = train |>
   mutate(transported = ifelse(transported == 1, "transported", "not transported"))
 
-tictoc::tic()
+train |>
+  count(transported)
+```
 
-doParallel::registerDoParallel()
-split = initial_split(sample_n(train, 1000), prop = 0.75, strata = transported)
-traintrain = training(split)
-traintest = testing(split)
+    ## # A tibble: 2 x 2
+    ##   transported         n
+    ##   <chr>           <int>
+    ## 1 not transported  4315
+    ## 2 transported      4378
 
-pre_recipe = recipe(transported ~ ., data = traintrain) |>
+### data splitting
+
+``` r
+split = initial_split(sample_n(train, 500), prop = 0.75, strata = transported)
+train_data = training(split)
+test_data = testing(split)
+
+paste0("training data: ", nrow(train_data), " rows, ", ncol(train_data), " columns")
+```
+
+    ## [1] "training data: 374 rows, 16 columns"
+
+``` r
+paste0("testing data: ", nrow(test_data), " rows, ", ncol(test_data), " columns")
+```
+
+    ## [1] "testing data: 126 rows, 16 columns"
+
+### creating preprocessing recipe
+
+``` r
+pre_recipe = recipe(transported ~ ., data = train_data) |>
   update_role(passenger_id, new_role = "ID") |>
   step_string2factor(all_nominal()) |>
-  step_nzv(all_nominal()) |>
   prep()
 
-prepped_data = bake(pre_recipe, new_data = traintrain)
-cv_folds = vfold_cv(prepped_data, v = 5)
+pre_recipe
+```
 
+    ## Recipe
+    ## 
+    ## Inputs:
+    ## 
+    ##       role #variables
+    ##         ID          1
+    ##    outcome          1
+    ##  predictor         14
+    ## 
+    ## Training data contained 374 data points and no missing data.
+    ## 
+    ## Operations:
+    ## 
+    ## Factor variables from passenger_id, home_planet, cryo_sleep, cabin_x,... [trained]
+
+### creating prepped data and cross-validation folds
+
+``` r
+prepped_data = bake(pre_recipe, new_data = train_data)
+cv_folds = vfold_cv(prepped_data, v = 3)
+cv_folds
+```
+
+    ## #  3-fold cross-validation 
+    ## # A tibble: 3 x 2
+    ##   splits            id   
+    ##   <list>            <chr>
+    ## 1 <split [249/125]> Fold1
+    ## 2 <split [249/125]> Fold2
+    ## 3 <split [250/124]> Fold3
+
+### building model specification
+
+``` r
 xgb_model = boost_tree(trees = 1000, min_n = tune(), tree_depth = tune(),
                        learn_rate = tune(), loss_reduction = tune()) |>
-  set_engine("xgboost") |>
+  set_engine("xgboost", eval_metric = "logloss") |>
   set_mode("classification")
 
+xgb_model
+```
+
+    ## Boosted Tree Model Specification (classification)
+    ## 
+    ## Main Arguments:
+    ##   trees = 1000
+    ##   min_n = tune()
+    ##   tree_depth = tune()
+    ##   learn_rate = tune()
+    ##   loss_reduction = tune()
+    ## 
+    ## Engine-Specific Arguments:
+    ##   eval_metric = logloss
+    ## 
+    ## Computational engine: xgboost
+
+### creating tuning parameters, grid, and modeling workflow
+
+``` r
 xgb_params = parameters(min_n(), tree_depth(), learn_rate(), loss_reduction())
-xgb_grid = grid_max_entropy(xgb_params, size = 25)
+xgb_grid = grid_max_entropy(xgb_params, size = 10)
 
 xgb_wf = workflow() |>
   add_model(xgb_model) |>
   add_formula(transported ~ .)
 
-xgb_tuned = tune_grid(object = xgb_wf, resamples = cv_folds, grid = xgb_grid,
-                      metrics = metric_set(f_meas), control = control_grid(verbose = T))
+xgb_wf
+```
 
+    ## == Workflow ====================================================================
+    ## Preprocessor: Formula
+    ## Model: boost_tree()
+    ## 
+    ## -- Preprocessor ----------------------------------------------------------------
+    ## transported ~ .
+    ## 
+    ## -- Model -----------------------------------------------------------------------
+    ## Boosted Tree Model Specification (classification)
+    ## 
+    ## Main Arguments:
+    ##   trees = 1000
+    ##   min_n = tune()
+    ##   tree_depth = tune()
+    ##   learn_rate = tune()
+    ##   loss_reduction = tune()
+    ## 
+    ## Engine-Specific Arguments:
+    ##   eval_metric = logloss
+    ## 
+    ## Computational engine: xgboost
+
+### tuning the model
+
+``` r
+doParallel::registerDoParallel()
+
+xgb_tuned = tune_grid(object = xgb_wf, resamples = cv_folds, grid = xgb_grid,
+                      metrics = metric_set(accuracy), control = control_grid(verbose = F))
+
+xgb_tuned |>
+  show_best("accuracy")
+```
+
+    ## # A tibble: 5 x 10
+    ##   min_n tree_depth learn_~1 loss_r~2 .metric .esti~3  mean     n std_err .config
+    ##   <int>      <int>    <dbl>    <dbl> <chr>   <chr>   <dbl> <int>   <dbl> <chr>  
+    ## 1    12          3 5.25e- 3 3.79e-10 accura~ binary  0.810     3  0.0109 Prepro~
+    ## 2     3         11 5.43e- 3 1.99e- 9 accura~ binary  0.789     3  0.0104 Prepro~
+    ## 3    21         14 7.70e-10 1.76e+ 0 accura~ binary  0.765     3  0.0104 Prepro~
+    ## 4    12         15 1.87e- 5 1.42e- 2 accura~ binary  0.749     3  0.0135 Prepro~
+    ## 5    12          3 2.83e- 5 5.77e- 3 accura~ binary  0.749     3  0.0135 Prepro~
+    ## # ... with abbreviated variable names 1: learn_rate, 2: loss_reduction,
+    ## #   3: .estimator
+
+### finalizing model
+
+``` r
 xgb_best_params = xgb_tuned |>
-  select_best("f_meas")
+  select_best("accuracy")
 
 xgb_model_final = xgb_model |>
   finalize_model(xgb_best_params)
 
+xgb_model_final
+```
+
+    ## Boosted Tree Model Specification (classification)
+    ## 
+    ## Main Arguments:
+    ##   trees = 1000
+    ##   min_n = 12
+    ##   tree_depth = 3
+    ##   learn_rate = 0.00524630659308444
+    ##   loss_reduction = 3.79422997574801e-10
+    ## 
+    ## Engine-Specific Arguments:
+    ##   eval_metric = logloss
+    ## 
+    ## Computational engine: xgboost
+
+### fitting tuned model on all training data
+
+``` r
 train_prediction = xgb_model_final |>
   fit(formula = transported ~ ., data = prepped_data) |>
   predict(new_data = prepped_data) |>
   bind_cols(prepped_data)
-```
 
-    ## [17:08:47] WARNING: amalgamation/../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
-
-``` r
 res = train_prediction |>
   count(.pred_class == transported) |>
   pull(n)
@@ -812,10 +948,4 @@ res = train_prediction |>
 paste0("accuracy: ", round(res[2] / sum(res), 4) * 100, "%")
 ```
 
-    ## [1] "accuracy: 83.71%"
-
-``` r
-tictoc::toc()
-```
-
-    ## 462.37 sec elapsed
+    ## [1] "accuracy: 82.62%"
