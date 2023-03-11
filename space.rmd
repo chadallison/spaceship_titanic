@@ -8,20 +8,37 @@ knit: (function(input, ...) { rmarkdown::render(input, output_file = "README.md"
 
 ### contents
 
-<!-- - [setup] -->
-<!-- - [data import] -->
-<!-- - [finding missing data] -->
-<!-- - [visualizing where missing values occur] -->
-<!-- - [exploring `home_planet`] -->
-<!-- - [exploring `cryo_sleep`] -->
-<!-- - [separating `cabin` into `cabin_x` and `cabin_y`] -->
-<!-- - [exploring `cabin_x`] -->
-<!-- - [moving `cabin_x` level *T* to level *other* (low frequency)] -->
-<!-- - [exploring `cabin_y`] -->
-<!-- - [exploring `destination`] -->
-<!-- - [exploring `age`] -->
-<!-- - [replacing missing `age` values & creating `age_group`] -->
-<!-- - [exploring `vip`] -->
+- [setup]
+- [data import]
+- [finding missing data]
+- [visualizing where missing values occur]
+- [exploring `home_planet`]
+- [exploring `cryo_sleep`]
+- [separating `cabin` into `cabin_x` and `cabin_y`]
+- [exploring `cabin_x`]
+- [moving `cabin_x` level *T* to level *other* (low frequency)]
+- [exploring `cabin_y`]
+- [exploring `destination`]
+- [exploring `age`]
+- [replacing missing `age` values & exploring `age`]
+- [exploring `vip`]
+- [exploring `room_service`]
+- [exploring `food_court`]
+- [exploring `shopping_mall`]
+- [exploring `spa`]
+- [exploring `vr_deck`]
+- [separating `name` into `first_name` and `last_name`]
+- [exploring `first_name`]
+- [exploring `last_name`]
+- [changing `transported` labels for modeling]
+- [data splitting]
+- [creating preprocessing recipe]
+- [creating prepped data and cross-validation folds]
+- [building model specification]
+- [creating tuning parameters, grid, and modeling workflow]
+- [tuning the model]
+- [finalizing model]
+- [fitting tuned model on all training data]
 
 ### setup
 
@@ -303,7 +320,7 @@ train |>
   theme(plot.subtitle = element_text(hjust = 0.5, size = 9, face = "italic", vjust = 2.75))
 ```
 
-### replacing missing `age` values & creating `age_group`
+### replacing missing `age` values & exploring `age`
 
 ```{r}
 train = train |>
@@ -709,7 +726,7 @@ xgb_wf
 ### tuning the model
 
 ```{r}
-doParallel::registerDoParallel()
+# doParallel::registerDoParallel()
 
 xgb_tuned = tune_grid(object = xgb_wf, resamples = cv_folds, grid = xgb_grid,
                       metrics = metric_set(accuracy), control = control_grid(verbose = F))

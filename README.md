@@ -5,20 +5,46 @@ spaceship titanic
 
 ### contents
 
-<!-- - [setup] -->
-<!-- - [data import] -->
-<!-- - [finding missing data] -->
-<!-- - [visualizing where missing values occur] -->
-<!-- - [exploring `home_planet`] -->
-<!-- - [exploring `cryo_sleep`] -->
-<!-- - [separating `cabin` into `cabin_x` and `cabin_y`] -->
-<!-- - [exploring `cabin_x`] -->
-<!-- - [moving `cabin_x` level *T* to level *other* (low frequency)] -->
-<!-- - [exploring `cabin_y`] -->
-<!-- - [exploring `destination`] -->
-<!-- - [exploring `age`] -->
-<!-- - [replacing missing `age` values & creating `age_group`] -->
-<!-- - [exploring `vip`] -->
+- [setup](#setup)
+- [data import](#data-import)
+- [finding missing data](#finding-missing-data)
+- [visualizing where missing values
+  occur](#visualizing-where-missing-values-occur)
+- [exploring `home_planet`](#exploring-home_planet)
+- [exploring `cryo_sleep`](#exploring-cryo_sleep)
+- [separating `cabin` into `cabin_x` and
+  `cabin_y`](#separating-cabin-into-cabin_x-and-cabin_y)
+- [exploring `cabin_x`](#exploring-cabin_x)
+- [moving `cabin_x` level *T* to level *other* (low
+  frequency)](#moving-cabin_x-level-t-to-level-other-low-frequency)
+- [exploring `cabin_y`](#exploring-cabin_y)
+- [exploring `destination`](#exploring-destination)
+- [exploring `age`](#exploring-age)
+- [replacing missing `age` values & exploring
+  `age`](#replacing-missing-age-values-exploring-age)
+- [exploring `vip`](#exploring-vip)
+- [exploring `room_service`](#exploring-room_service)
+- [exploring `food_court`](#exploring-food_court)
+- [exploring `shopping_mall`](#exploring-shopping_mall)
+- [exploring `spa`](#exploring-spa)
+- [exploring `vr_deck`](#exploring-vr_deck)
+- [separating `name` into `first_name` and
+  `last_name`](#separating-name-into-first_name-and-last_name)
+- [exploring `first_name`](#exploring-first_name)
+- [exploring `last_name`](#exploring-last_name)
+- [changing `transported` labels for
+  modeling](#changing-transported-labels-for-modeling)
+- [data splitting](#data-splitting)
+- [creating preprocessing recipe](#creating-preprocessing-recipe)
+- [creating prepped data and cross-validation
+  folds](#creating-prepped-data-and-cross-validation-folds)
+- [building model specification](#building-model-specification)
+- [creating tuning parameters, grid, and modeling
+  workflow](#creating-tuning-parameters-grid-and-modeling-workflow)
+- [tuning the model](#tuning-the-model)
+- [finalizing model](#finalizing-model)
+- [fitting tuned model on all training
+  data](#fitting-tuned-model-on-all-training-data)
 
 ### setup
 
@@ -198,13 +224,13 @@ train |>
   sample_n(5)
 ```
 
-    ## # A tibble: 5 x 2
+    ## # A tibble: 5 × 2
     ##   cabin_x cabin_y
     ##   <chr>   <chr>  
-    ## 1 B       P      
-    ## 2 G       P      
-    ## 3 G       P      
-    ## 4 F       P      
+    ## 1 F       P      
+    ## 2 A       S      
+    ## 3 C       P      
+    ## 4 G       P      
     ## 5 B       S
 
 ### exploring `cabin_x`
@@ -355,7 +381,7 @@ train |>
 
 ![](README_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
 
-### replacing missing `age` values & creating `age_group`
+### replacing missing `age` values & exploring `age`
 
 ``` r
 train = train |>
@@ -647,14 +673,14 @@ train |>
   sample_n(5)
 ```
 
-    ## # A tibble: 5 x 2
-    ##   first_name last_name
-    ##   <chr>      <chr>    
-    ## 1 Dianie     Dickman  
-    ## 2 unknown    unknown  
-    ## 3 Cassa      Carsoning
-    ## 4 Inerry     Briggston
-    ## 5 Weias      Duckil
+    ## # A tibble: 5 × 2
+    ##   first_name last_name 
+    ##   <chr>      <chr>     
+    ## 1 Heald      Johnsby   
+    ## 2 Estina     Holcompson
+    ## 3 Lynney     Chanan    
+    ## 4 Antitak    Scerodbox 
+    ## 5 Emmax      Baketton
 
 ### exploring `first_name`
 
@@ -758,7 +784,7 @@ train |>
   count(transported)
 ```
 
-    ## # A tibble: 2 x 2
+    ## # A tibble: 2 × 2
     ##   transported         n
     ##   <chr>           <int>
     ## 1 not transported  4315
@@ -774,13 +800,13 @@ test_data = testing(split)
 paste0("training data: ", nrow(train_data), " rows, ", ncol(train_data), " columns")
 ```
 
-    ## [1] "training data: 374 rows, 16 columns"
+    ## [1] "training data: 375 rows, 16 columns"
 
 ``` r
 paste0("testing data: ", nrow(test_data), " rows, ", ncol(test_data), " columns")
 ```
 
-    ## [1] "testing data: 126 rows, 16 columns"
+    ## [1] "testing data: 125 rows, 16 columns"
 
 ### creating preprocessing recipe
 
@@ -802,7 +828,7 @@ pre_recipe
     ##    outcome          1
     ##  predictor         14
     ## 
-    ## Training data contained 374 data points and no missing data.
+    ## Training data contained 375 data points and no missing data.
     ## 
     ## Operations:
     ## 
@@ -817,12 +843,12 @@ cv_folds
 ```
 
     ## #  3-fold cross-validation 
-    ## # A tibble: 3 x 2
+    ## # A tibble: 3 × 2
     ##   splits            id   
     ##   <list>            <chr>
-    ## 1 <split [249/125]> Fold1
-    ## 2 <split [249/125]> Fold2
-    ## 3 <split [250/124]> Fold3
+    ## 1 <split [250/125]> Fold1
+    ## 2 <split [250/125]> Fold2
+    ## 3 <split [250/125]> Fold3
 
 ### building model specification
 
@@ -862,14 +888,14 @@ xgb_wf = workflow() |>
 xgb_wf
 ```
 
-    ## == Workflow ====================================================================
+    ## ══ Workflow ════════════════════════════════════════════════════════════════════
     ## Preprocessor: Formula
     ## Model: boost_tree()
     ## 
-    ## -- Preprocessor ----------------------------------------------------------------
+    ## ── Preprocessor ────────────────────────────────────────────────────────────────
     ## transported ~ .
     ## 
-    ## -- Model -----------------------------------------------------------------------
+    ## ── Model ───────────────────────────────────────────────────────────────────────
     ## Boosted Tree Model Specification (classification)
     ## 
     ## Main Arguments:
@@ -887,7 +913,7 @@ xgb_wf
 ### tuning the model
 
 ``` r
-doParallel::registerDoParallel()
+# doParallel::registerDoParallel()
 
 xgb_tuned = tune_grid(object = xgb_wf, resamples = cv_folds, grid = xgb_grid,
                       metrics = metric_set(accuracy), control = control_grid(verbose = F))
@@ -896,16 +922,15 @@ xgb_tuned |>
   show_best("accuracy")
 ```
 
-    ## # A tibble: 5 x 10
-    ##   min_n tree_depth learn_~1 loss_r~2 .metric .esti~3  mean     n std_err .config
-    ##   <int>      <int>    <dbl>    <dbl> <chr>   <chr>   <dbl> <int>   <dbl> <chr>  
-    ## 1    12          3 5.25e- 3 3.79e-10 accura~ binary  0.810     3  0.0109 Prepro~
-    ## 2     3         11 5.43e- 3 1.99e- 9 accura~ binary  0.789     3  0.0104 Prepro~
-    ## 3    21         14 7.70e-10 1.76e+ 0 accura~ binary  0.765     3  0.0104 Prepro~
-    ## 4    12         15 1.87e- 5 1.42e- 2 accura~ binary  0.749     3  0.0135 Prepro~
-    ## 5    12          3 2.83e- 5 5.77e- 3 accura~ binary  0.749     3  0.0135 Prepro~
-    ## # ... with abbreviated variable names 1: learn_rate, 2: loss_reduction,
-    ## #   3: .estimator
+    ## # A tibble: 5 × 10
+    ##   min_n tree_depth learn_r…¹ loss_…² .metric .esti…³  mean     n std_err .config
+    ##   <int>      <int>     <dbl>   <dbl> <chr>   <chr>   <dbl> <int>   <dbl> <chr>  
+    ## 1    19         11   3.34e-3 5.07e-7 accura… binary  0.795     3 0.00706 Prepro…
+    ## 2     9         12   3.45e-4 9.82e-2 accura… binary  0.795     3 0.00267 Prepro…
+    ## 3    11          3   8.47e-4 1.43e+0 accura… binary  0.765     3 0.00706 Prepro…
+    ## 4     6          2   1.73e-8 3.87e-8 accura… binary  0.76      3 0.0122  Prepro…
+    ## 5     3         10   2.44e-8 2.18e-9 accura… binary  0.757     3 0.0141  Prepro…
+    ## # … with abbreviated variable names ¹​learn_rate, ²​loss_reduction, ³​.estimator
 
 ### finalizing model
 
@@ -923,10 +948,10 @@ xgb_model_final
     ## 
     ## Main Arguments:
     ##   trees = 1000
-    ##   min_n = 12
-    ##   tree_depth = 3
-    ##   learn_rate = 0.00524630659308444
-    ##   loss_reduction = 3.79422997574801e-10
+    ##   min_n = 19
+    ##   tree_depth = 11
+    ##   learn_rate = 0.00333691313099339
+    ##   loss_reduction = 5.06656141520727e-07
     ## 
     ## Engine-Specific Arguments:
     ##   eval_metric = logloss
@@ -948,4 +973,4 @@ res = train_prediction |>
 paste0("accuracy: ", round(res[2] / sum(res), 4) * 100, "%")
 ```
 
-    ## [1] "accuracy: 82.62%"
+    ## [1] "accuracy: 83.2%"
